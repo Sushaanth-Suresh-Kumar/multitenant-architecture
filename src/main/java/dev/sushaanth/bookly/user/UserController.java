@@ -2,6 +2,7 @@ package dev.sushaanth.bookly.user;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,6 +18,7 @@ public class UserController {
         this.userRepository = userRepository;
     }
 
+    @GetMapping()
     List<User> getUsers() {
         logger.info("returning a list users");
         return this.userRepository.findAll();
