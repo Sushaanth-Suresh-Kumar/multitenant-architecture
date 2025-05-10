@@ -14,7 +14,7 @@ public class TenantIdentifierResolver implements CurrentTenantIdentifierResolver
 
     @Override
     public String resolveCurrentTenantIdentifier() {
-        return Objects.requireNonNullElse(TenantContext.getTenantId(), "PUBLIC");
+        return Objects.requireNonNullElse(TenantContext.getTenantId(), "public");
     }
 
     @Override

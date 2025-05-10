@@ -27,4 +27,20 @@ public class User {
         this.firstName = firstName;
         this.lastName = lastName;
     }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
 }
