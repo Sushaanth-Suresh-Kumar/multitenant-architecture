@@ -1,20 +1,22 @@
 services:
   postgres:
-    image: postgres:17.4
-    container_name: library_db
+    image: postgres:15.0
     environment:
-      - POSTGRES_DB=library
-      - POSTGRES_USER=libadmin
-      - POSTGRES_PASSWORD=libpassword
+      - POSTGRES_DB=multitenant
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     ports:
-      - "5432:5432"
+      - "8000:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U libadmin -d library"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - postgres-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - multitenant-network
 
 volumes:
-  postgres_data:
+  app-data:
+  postgres-data:
+
+networks:
+  multitenant-network:
+    driver: bridge
