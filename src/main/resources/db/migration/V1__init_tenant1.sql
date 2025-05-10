@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS tenant1.users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL
-);
