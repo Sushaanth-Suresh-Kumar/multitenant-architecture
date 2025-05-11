@@ -21,8 +21,7 @@ public class User {
     public User() {
     }
 
-    public User(UUID id, String username, String firstName, String lastName) {
-        this.id = id;
+    public User(String username, String firstName, String lastName) {
         this.username = username;
         this.firstName = firstName;
         this.lastName = lastName;

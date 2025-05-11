@@ -1,10 +1,10 @@
-package dev.sushaanth.library_management_backend;
+package dev.sushaanth.bookly;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class LibraryManagementBackendApplicationTests {
+class BooklyApplicationTests {
 
 	@Test
 	void contextLoads() {
