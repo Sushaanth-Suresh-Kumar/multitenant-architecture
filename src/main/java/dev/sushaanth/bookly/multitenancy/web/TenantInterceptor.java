@@ -28,9 +28,11 @@ public class TenantInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // Skip tenant validation for tenant management APIs
+        // Skip tenant validation for auth endpoints, tenant management APIs, and error pages
         String requestPath = request.getRequestURI();
-        if (requestPath.startsWith("/api/tenants") || requestPath.startsWith("/error")) {
+        if (requestPath.startsWith("/api/auth") ||
+                requestPath.startsWith("/api/tenants") ||
+                requestPath.startsWith("/error")) {
             return true;
         }
 

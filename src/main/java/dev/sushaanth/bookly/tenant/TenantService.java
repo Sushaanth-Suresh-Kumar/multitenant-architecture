@@ -3,6 +3,7 @@ package dev.sushaanth.bookly.tenant;
 import dev.sushaanth.bookly.tenant.dto.TenantCreateRequest;
 import dev.sushaanth.bookly.tenant.dto.TenantResponse;
 import dev.sushaanth.bookly.tenant.exception.TenantCreationException;
+import dev.sushaanth.bookly.tenant.exception.TenantNotFoundException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.hibernate.Session;
@@ -42,6 +43,12 @@ public class TenantService {
         return tenantRepository.findAll().stream()
                 .map(this::mapToTenantResponse)
                 .collect(Collectors.toList());
+    }
+
+    public UUID getTenantIdByName(String displayName) {
+        return tenantRepository.findByDisplayName(displayName)
+                .map(Tenant::getId)
+                .orElseThrow(() -> new TenantNotFoundException("Tenant not found with name: " + displayName));
     }
 
     @Transactional
@@ -159,8 +166,10 @@ public class TenantService {
 
     private TenantResponse mapToTenantResponse(Tenant tenant) {
         return new TenantResponse(
+                tenant.getId(),
                 tenant.getDisplayName(),
-                tenant.getDescription()
+                tenant.getDescription(),
+                tenant.getSchemaName()
         );
     }
 }
