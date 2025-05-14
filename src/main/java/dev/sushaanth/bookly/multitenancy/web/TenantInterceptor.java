@@ -1,8 +1,9 @@
 package dev.sushaanth.bookly.multitenancy.web;
 
 import dev.sushaanth.bookly.multitenancy.context.TenantContext;
-import dev.sushaanth.bookly.multitenancy.exception.InvalidTenantException;
+import dev.sushaanth.bookly.tenant.exception.InvalidTenantException;
 import dev.sushaanth.bookly.multitenancy.resolver.HttpHeaderTenantResolver;
+import dev.sushaanth.bookly.tenant.TenantRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -13,40 +14,46 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
-import java.util.Arrays;
-import java.util.List;
-
 @Component
 public class TenantInterceptor implements HandlerInterceptor {
     private static final Logger logger = LoggerFactory.getLogger(TenantInterceptor.class);
-    
-    // List of valid tenants
-    private static final List<String> VALID_TENANTS = Arrays.asList("tenant1", "tenant2");
 
     private final HttpHeaderTenantResolver httpHeaderTenantResolver;
+    private final TenantRepository tenantRepository;
 
-    public TenantInterceptor(HttpHeaderTenantResolver httpHeaderTenantResolver) {
+    public TenantInterceptor(HttpHeaderTenantResolver httpHeaderTenantResolver, TenantRepository tenantRepository) {
         this.httpHeaderTenantResolver = httpHeaderTenantResolver;
+        this.tenantRepository = tenantRepository;
     }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        var tenantId = httpHeaderTenantResolver.resolveTenantId(request);
-        
+        // Skip tenant validation for tenant management APIs
+        String requestPath = request.getRequestURI();
+        if (requestPath.startsWith("/api/tenants") || requestPath.startsWith("/error")) {
+            return true;
+        }
+
+        var tenantHeader = httpHeaderTenantResolver.resolveTenantId(request);
+
         // Check if tenant header is present
-        if (!StringUtils.hasText(tenantId)) {
+        if (!StringUtils.hasText(tenantHeader)) {
             logger.warn("Tenant header is missing in the request");
             throw new InvalidTenantException("Tenant header is required");
         }
-        
-        // Validate that tenant is valid
-        if (!VALID_TENANTS.contains(tenantId)) {
-            logger.warn("Invalid tenant: {}", tenantId);
-            throw new InvalidTenantException("Invalid tenant: " + tenantId);
+
+        // Find tenant by schema name - avoid logging the tenant identifier
+        var tenant = tenantRepository.findBySchemaName(tenantHeader);
+
+        // Validate that tenant exists
+        if (tenant.isEmpty()) {
+            logger.warn("Invalid tenant specified in request");
+            throw new InvalidTenantException("Invalid tenant specified");
         }
-        
-        logger.debug("Request is using tenant: {}", tenantId);
-        TenantContext.setTenantId(tenantId);
+
+        // Use schema name for tenant context - avoid logging sensitive information
+        String schemaName = tenant.get().getSchemaName();
+        TenantContext.setTenantId(schemaName);
         return true;
     }
 
