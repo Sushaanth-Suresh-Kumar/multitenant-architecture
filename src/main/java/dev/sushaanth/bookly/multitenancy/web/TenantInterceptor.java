@@ -32,6 +32,7 @@ public class TenantInterceptor implements HandlerInterceptor {
         String requestPath = request.getRequestURI();
         if (requestPath.startsWith("/api/auth") ||
                 requestPath.startsWith("/api/tenants") ||
+                requestPath.startsWith("/swagger-ui") ||
                 requestPath.startsWith("/error")) {
             return true;
         }

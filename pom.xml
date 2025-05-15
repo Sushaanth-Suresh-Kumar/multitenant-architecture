@@ -31,6 +31,7 @@
 		<flyway.version>10.4.1</flyway.version>
 		<testcontainers.version>1.19.5</testcontainers.version>
 		<jjwt.version>0.12.6</jjwt.version>
+		<swagger.version>2.4.0</swagger.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -48,6 +49,15 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${swagger.version}</version>
 		</dependency>
 
 		<!-- JWT Dependencies -->
