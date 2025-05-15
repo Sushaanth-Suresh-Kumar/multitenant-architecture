@@ -123,4 +123,4 @@ As this project is still in development, contributions are welcome. Please feel 
 
 ---
 
-Project maintained by [Your Name](https://github.com/yourusername)
+Project maintained by [Sushaanth Suresh Kumar](https://github.com/Sushaanth-Suresh-Kumar)
