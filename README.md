@@ -62,6 +62,36 @@ Bookly is a multi-tenant library management system built with Spring Boot, desig
    http://localhost:8080/swagger-ui
    ```
 
+## 🔐 Environment Variables
+
+This application uses environment variables to securely manage sensitive information such as email credentials.
+
+### Setting Up Environment Variables
+
+1. Create a `.env` file in the root directory of the project:
+   ```
+   touch .env
+   chmod 600 .env  # Set restrictive permissions
+   ```
+
+2. Add the following variables to your `.env` file:
+   ```
+   MAIL_USERNAME=your_email@gmail.com
+   MAIL_PASSWORD=your_app_password
+   ```
+
+3. For Gmail, you need to use an App Password instead of your regular account password:
+   - Go to your Google account > Security > 2-Step Verification
+   - Scroll down to "App passwords"
+   - Create a new app password for "Mail" and use it as your `MAIL_PASSWORD`
+
+### Security Note
+
+- **NEVER commit your `.env` file to version control**
+- The `.env` file is already added to `.gitignore`
+- If you accidentally commit sensitive information, revoke the credentials immediately and rotate them
+- Use `application.properties.example` as a template for required environment variables
+
 ## 📝 API Endpoints
 
 ### Authentication
