@@ -35,6 +35,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/tenants/register").permitAll()
                         .requestMatchers("/api/tenants/**").hasRole("ADMIN")
+                        // Add these lines to permit Swagger UI access
+                        .requestMatchers("/swagger-ui/**").permitAll()
+                        .requestMatchers("/swagger-ui.html").permitAll()
+                        .requestMatchers("/api-docs/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**").permitAll() // This is important!
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

@@ -33,6 +33,8 @@ public class TenantInterceptor implements HandlerInterceptor {
         if (requestPath.startsWith("/api/auth") ||
                 requestPath.startsWith("/api/tenants") ||
                 requestPath.startsWith("/swagger-ui") ||
+                requestPath.startsWith("/api-docs") ||
+                requestPath.startsWith("/v3/api-docs") || // Add this
                 requestPath.startsWith("/error")) {
             return true;
         }
