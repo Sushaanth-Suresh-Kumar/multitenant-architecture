@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
@@ -15,14 +16,26 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    @Value("${spring.mail.username}")
+    private String emailUser;
+
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
+
+        if (mailSender instanceof JavaMailSenderImpl) {
+            JavaMailSenderImpl mailSenderImpl = (JavaMailSenderImpl) mailSender;
+            logger.info("Mail configuration: host={}, port={}, username={}",
+                    mailSenderImpl.getHost(), mailSenderImpl.getPort(), mailSenderImpl.getUsername());
+            logger.info("Mail properties: {}", mailSenderImpl.getJavaMailProperties());
+        }
     }
 
     public void sendOtp(String to, String otp) {
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
+
+            helper.setFrom(emailUser);
 
             String htmlMsg = "<div style='font-family: Arial, sans-serif; padding: 20px; max-width: 600px;'>"
                     + "<h2 style='color: #4285f4;'>Bookly - Email Verification</h2>"
