@@ -346,7 +346,7 @@ public class AuthService {
                 .findByEmailAndUsedFalse(request.email())
                 .orElseThrow(() -> new RuntimeException("No valid invitation found for this email"));
 
-
+        // Check if the invitation has expired
         if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new InvitationExpiredException("Invitation has expired. Please request a new invitation.");
         }
@@ -457,7 +457,7 @@ public class AuthService {
             employeeInvitationRepository.save(invitation);
 
             // Send invitation email
-            // emailService.sendEmployeeInvitation(email, admin.getUsername(), tenant.getDisplayName(), tenant.getSchemaName());
+            emailService.sendEmployeeInvitation(email, admin.getUsername(), tenant.getDisplayName(), tenant.getSchemaName());
 
             logger.info("Employee invitation created for email: {} in tenant: {}",
                     email, tenant.getDisplayName());
@@ -465,6 +465,31 @@ public class AuthService {
             logger.error("Failed to create employee invitation", e);
             throw new RuntimeException("Failed to create invitation: " + e.getMessage(), e);
         }
+    }
+
+
+    public void resendEmployeeInvitation(EmployeeInvitation invitation) {
+        // Find the admin who created the invitation
+        LibraryUser admin = userRepository.findById(invitation.getInvitedBy())
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        // Find the tenant
+        Tenant tenant = tenantRepository.findById(invitation.getTenantId())
+                .orElseThrow(() -> new TenantNotFoundException("Tenant not found"));
+
+        // Update expiration date
+        invitation.setExpiresAt(LocalDateTime.now().plusDays(7));
+        employeeInvitationRepository.save(invitation);
+
+        // Send invitation email
+        emailService.sendEmployeeInvitation(
+                invitation.getEmail(),
+                admin.getUsername(),
+                tenant.getDisplayName(),
+                invitation.getId().toString()
+        );
+
+        logger.info("Resent invitation to {} for tenant {}", invitation.getEmail(), tenant.getDisplayName());
     }
 
     /**
