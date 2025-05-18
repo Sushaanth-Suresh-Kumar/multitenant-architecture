@@ -7,26 +7,38 @@
 
 ## 🚧 Work In Progress 🚧
 
-Bookly is a multi-tenant library management system built with Spring Boot, designed to support multiple libraries on a single platform. Each library operates in its own isolated tenant environment with dedicated data storage.
+Bookly is a multi-tenant library management system built with Spring Boot, designed to support multiple libraries on a single platform. Each library operates in its own isolated tenant environment with dedicated data storage through schema-based isolation.
+
+## 🏗️ Architecture Overview
+
+The system implements a schema-based multi-tenancy pattern:
+
+- Each tenant (library) has a dedicated PostgreSQL schema
+- `TenantContext` maintains the current tenant ID in a ThreadLocal variable
+- `HttpHeaderTenantResolver` extracts tenant information from HTTP headers
+- `ConnectionProvider` manages database connections with the correct schema
+- Tenant isolation ensures data security between different libraries
 
 ## 🔑 Key Features
 
-- **Multi-tenancy**: Schema-based tenant isolation for data security
+- **Schema-based Multi-tenancy**: Complete tenant isolation for data security
 - **JWT Authentication**: Secure authentication with ECDSA-signed JWTs
 - **Email Verification**: OTP-based email verification during registration
 - **Role-based Access Control**: Library administrators and employees have different permissions
-- **RESTful API**: Well-structured API with proper documentation
+- **Employee Invitation System**: Admins can invite staff to join their library
+- **RESTful API**: Well-structured API with proper error handling
 - **Swagger UI**: Interactive API documentation
 
 ## 🛠️ Technologies Used
 
 - **Java 21**
 - **Spring Boot 3.4.5**
-- **Spring Security**
-- **Spring Data JPA**
-- **PostgreSQL**
+- **Spring Security** for authentication and authorization
+- **Spring Data JPA** for database access
+- **PostgreSQL** for data storage
 - **Flyway** for database migrations
-- **JWT** for authentication
+- **JWT (JJWT 0.12.6)** for authentication tokens
+- **Testcontainers** for integration testing
 - **Docker** for containerization
 - **SpringDoc OpenAPI** for API documentation
 
@@ -34,7 +46,7 @@ Bookly is a multi-tenant library management system built with Spring Boot, desig
 
 ### Prerequisites
 
-- Java 21
+- Java 21 or higher
 - Docker and Docker Compose
 - Maven
 - PostgreSQL (or use the provided Docker Compose setup)
@@ -47,109 +59,138 @@ Bookly is a multi-tenant library management system built with Spring Boot, desig
    cd bookly
    ```
 
-2. Start the PostgreSQL database:
+2. Configure environment variables:
    ```
-   docker-compose up -d
-   ```
-
-3. Run the application:
-   ```
-   ./mvnw spring-boot:run
-   ```
-
-4. Access the API documentation:
-   ```
-   http://localhost:8080/swagger-ui
-   ```
-
-## 🔐 Environment Variables
-
-This application uses environment variables to securely manage sensitive information such as email credentials.
-
-### Setting Up Environment Variables
-
-1. Create a `.env` file in the root directory of the project:
-   ```
+   # Create and edit .env file with required variables
    touch .env
-   chmod 600 .env  # Set restrictive permissions
-   ```
-
-2. Add the following variables to your `.env` file:
-   ```
+   chmod 600 .env
+   
+   # Add required variables
    MAIL_USERNAME=your_email@gmail.com
    MAIL_PASSWORD=your_app_password
    ```
 
-3. For Gmail, you need to use an App Password instead of your regular account password:
-   - Go to your Google account > Security > 2-Step Verification
-   - Scroll down to "App passwords"
-   - Create a new app password for "Mail" and use it as your `MAIL_PASSWORD`
+3. Start the PostgreSQL database:
+   ```
+   docker-compose up -d
+   ```
 
-### Security Note
+4. Run the application:
+   ```
+   ./mvnw spring-boot:run
+   ```
 
-- **NEVER commit your `.env` file to version control**
-- The `.env` file is already added to `.gitignore`
-- If you accidentally commit sensitive information, revoke the credentials immediately and rotate them
-- Use `application.properties.example` as a template for required environment variables
+5. Access the API documentation:
+   ```
+   http://localhost:8080/swagger-ui
+   ```
 
-## 📝 API Endpoints
+## 📡 API Endpoints
 
 ### Authentication
 
-- `POST /api/auth/register/library` - Register a new library
-- `POST /api/auth/register/employee` - Register a library employee
 - `POST /api/auth/login` - Authenticate and get JWT token
+- `POST /api/auth/register/library` - Register a new library
+- `POST /api/auth/register/employee` - Register as a library employee (requires invitation)
 - `POST /api/auth/verify` - Verify OTP for registration
 - `POST /api/auth/resend-otp` - Resend OTP if expired
 
+### Tenant Management
+
+- `GET /api/tenants` - Get all tenants (admin only)
+- `POST /api/tenants` - Create a new tenant (admin only)
+
 ### User Management
 
-- `GET /users` - Get all users
-- `POST /users` - Create a new user
+- `GET /users` - Get all users in current tenant
+- `POST /users` - Create a new user in current tenant
 
-### Employee Management
+## 🔐 Authentication Flow
 
-- `POST /api/employees/invite` - Invite an employee to join the library
+1. **Library Registration**:
+   - Admin submits registration with library details
+   - System sends OTP to verify email
+   - Upon verification, creates new tenant schema and admin account
 
-## 📋 Project Structure
+2. **Employee Registration**:
+   - Admin invites employee via email
+   - Employee registers with invitation
+   - System sends OTP to verify email
+   - Upon verification, creates employee account in the correct tenant
+
+3. **Authentication**:
+   - Users login with username/password
+   - System issues JWT token with tenant ID embedded
+   - Token is used for subsequent API calls
+
+4. **Request Flow**:
+   - `TenantInterceptor` extracts tenant from request header
+   - `TenantContext` stores tenant ID for the request duration
+   - `ConnectionProvider` switches to correct database schema
+   - Operations are isolated to the tenant's schema
+
+## 📂 Project Structure
 
 ```
 src/main/java/dev/sushaanth/bookly/
 ├── BooklyApplication.java                  # Application entry point
-├── config/                                 # Configuration classes
 ├── exception/                              # Global exception handling
 ├── multitenancy/                           # Multi-tenancy implementation
 │   ├── context/                            # Tenant context
+│   │   └── TenantContext.java              # ThreadLocal tenant storage
 │   ├── data/                               # Data isolation
+│   │   └── hibernate/                      # Hibernate integration
 │   ├── resolver/                           # Tenant resolution
+│   │   └── HttpHeaderTenantResolver.java   # Extract tenant from HTTP headers
 │   └── web/                                # Web request handling
+│       └── TenantInterceptor.java          # Process tenant in HTTP requests
 ├── security/                               # Security implementation
 │   ├── controller/                         # Auth controllers
-│   ├── dto/                                # Data transfer objects
+│   ├── dto/                                # Auth DTOs
 │   ├── model/                              # Security entities
-│   ├── repository/                         # Security repositories
+│   │   ├── LibraryUser.java                # User entity
+│   │   ├── Role.java                       # User roles
+│   │   └── VerificationToken.java          # Email verification
 │   └── service/                            # Security services
 ├── tenant/                                 # Tenant management
+│   ├── Tenant.java                         # Tenant entity
+│   └── TenantService.java                  # Tenant operations
 └── user/                                   # User management
+    ├── User.java                           # Library user entity
+    └── UserController.java                 # User API endpoints
 ```
 
-## 📜 License
+## 🧪 Testing
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+The project includes integration tests using Testcontainers:
+
+```bash
+# Run all tests
+./mvnw test
+
+# Run specific test class
+./mvnw test -Dtest=MultiTenantConcurrencyTest
+```
+
+The `MultiTenantConcurrencyTest` verifies that tenant isolation works correctly under concurrent access.
 
 ## 🔮 Future Plans
 
-- Implement book management
-- Add borrowing functionality
-- Create dashboard analytics
-- Add reporting features
-- Implement webhooks for integrations
-- Support for SSO and OAuth 2.0
+- Book management and cataloging
+- Borrowing system with due date tracking
+- Fine calculation
+- Reporting and analytics
 - Mobile app integration
+- SSO and OAuth 2.0 support
+- Event-driven architecture with webhooks
 
 ## 👨‍💻 Contributing
 
 As this project is still in development, contributions are welcome. Please feel free to submit a pull request or open an issue.
+
+## 📝 License
+
+This project is licensed under the MIT License.
 
 ---
 
