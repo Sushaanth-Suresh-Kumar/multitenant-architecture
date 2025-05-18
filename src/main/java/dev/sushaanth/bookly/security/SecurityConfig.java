@@ -1,6 +1,8 @@
 // src/main/java/dev/sushaanth/bookly/security/SecurityConfig.java
 package dev.sushaanth.bookly.security;
 
+import dev.sushaanth.bookly.security.jwt.JwtAuthenticationEntryPoint;
+import dev.sushaanth.bookly.security.jwt.JwtRequestFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;

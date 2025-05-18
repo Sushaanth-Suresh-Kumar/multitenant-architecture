@@ -2,7 +2,8 @@ package dev.sushaanth.bookly.security.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.sushaanth.bookly.multitenancy.context.TenantContext;
-import dev.sushaanth.bookly.security.JwtTokenUtil;
+import dev.sushaanth.bookly.security.exception.InvitationExpiredException;
+import dev.sushaanth.bookly.security.jwt.JwtTokenUtil;
 import dev.sushaanth.bookly.security.dto.JwtResponse;
 import dev.sushaanth.bookly.security.dto.LoginRequest;
 import dev.sushaanth.bookly.security.dto.RegistrationRequest;
@@ -344,6 +345,11 @@ public class AuthService {
         EmployeeInvitation invitation = employeeInvitationRepository
                 .findByEmailAndUsedFalse(request.email())
                 .orElseThrow(() -> new RuntimeException("No valid invitation found for this email"));
+
+
+        if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new InvitationExpiredException("Invitation has expired. Please request a new invitation.");
+        }
 
         // Get tenant information
         Tenant tenant = tenantRepository.findById(invitation.getTenantId())

@@ -1,5 +1,6 @@
 package dev.sushaanth.bookly.exception;
 
+import dev.sushaanth.bookly.security.exception.InvitationExpiredException;
 import dev.sushaanth.bookly.tenant.exception.InvalidTenantException;
 import dev.sushaanth.bookly.tenant.exception.TenantAlreadyExistsException;
 import dev.sushaanth.bookly.tenant.exception.TenantCreationException;
@@ -104,6 +105,40 @@ public class GlobalExceptionHandler {
         problemDetail.setType(URI.create("https://api.bookly.dev/errors/tenant-not-found"));
         problemDetail.setProperty("timestamp", Instant.now());
 
+        return problemDetail;
+    }
+
+    /**
+     * Handles {@link InvitationExpiredException} by creating a properly formatted
+     * Problem Details response according to RFC 7807.
+     * <p>
+     * This handler responds with HTTP 410 (Gone) status code, which is the appropriate
+     * status for resources that no longer exist but once did. In this case, it indicates
+     * that an invitation was valid but has expired due to time limitations.
+     * <p>
+     * The response follows the Problem Details for HTTP APIs specification (RFC 7807)
+     * and includes:
+     * <ul>
+     *   <li>A HTTP 410 Gone status code</li>
+     *   <li>A detailed error message from the exception</li>
+     *   <li>A descriptive title ("Invitation Expired")</li>
+     *   <li>A type URI that can be used to identify this class of error</li>
+     *   <li>A timestamp indicating when the error occurred</li>
+     * </ul>
+     *
+     * @param ex The InvitationExpiredException thrown when a user attempts to use an expired invitation
+     * @return A {@link ProblemDetail} object containing structured information about the error
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc7807">RFC 7807: Problem Details for HTTP APIs</a>
+     */
+    @ExceptionHandler(InvitationExpiredException.class)
+    public ProblemDetail handleInvitationExpiredException(InvitationExpiredException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.GONE,
+                ex.getMessage()
+        );
+        problemDetail.setTitle("Invitation Expired");
+        problemDetail.setType(URI.create("https://api.bookly.dev/errors/invitation-expired"));
+        problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
     }
 }

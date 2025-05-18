@@ -1,4 +1,4 @@
-package dev.sushaanth.bookly.security;
+package dev.sushaanth.bookly.security.jwt;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

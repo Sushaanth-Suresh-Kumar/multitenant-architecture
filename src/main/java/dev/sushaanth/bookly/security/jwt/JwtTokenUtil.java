@@ -1,4 +1,4 @@
-package dev.sushaanth.bookly.security;
+package dev.sushaanth.bookly.security.jwt;
 
 import dev.sushaanth.bookly.security.model.Role;
 import io.jsonwebtoken.*;
