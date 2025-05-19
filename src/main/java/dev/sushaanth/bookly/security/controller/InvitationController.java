@@ -3,11 +3,19 @@ package dev.sushaanth.bookly.security.controller;
 import dev.sushaanth.bookly.security.dto.InvitationRequest;
 import dev.sushaanth.bookly.security.dto.InvitationResponse;
 import dev.sushaanth.bookly.security.model.EmployeeInvitation;
+import dev.sushaanth.bookly.security.model.LibraryUser;
 import dev.sushaanth.bookly.security.repository.EmployeeInvitationRepository;
+import dev.sushaanth.bookly.security.repository.LibraryUserRepository;
 import dev.sushaanth.bookly.security.service.AuthService;
+import dev.sushaanth.bookly.tenant.exception.TenantNotFoundException;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -18,13 +26,17 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/invitations")
 public class InvitationController {
+    private static final Logger logger = LoggerFactory.getLogger(InvitationController.class);
 
     private final EmployeeInvitationRepository invitationRepository;
+    private final LibraryUserRepository userRepository;
     private final AuthService authService;
 
     public InvitationController(EmployeeInvitationRepository invitationRepository,
+                                LibraryUserRepository userRepository,
                                 AuthService authService) {
         this.invitationRepository = invitationRepository;
+        this.userRepository = userRepository;
         this.authService = authService;
     }
 
@@ -64,7 +76,7 @@ public class InvitationController {
 
         // Find invitation and verify it belongs to the user's tenant
         EmployeeInvitation invitation = invitationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Invitation not found"));
+                .orElseThrow(() -> new TenantNotFoundException("Invitation not found"));
 
         if (!invitation.getTenantId().equals(tenantId)) {
             throw new AccessDeniedException("You don't have permission to delete this invitation");
@@ -81,7 +93,7 @@ public class InvitationController {
 
         // Find invitation and verify it belongs to the user's tenant
         EmployeeInvitation invitation = invitationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Invitation not found"));
+                .orElseThrow(() -> new TenantNotFoundException("Invitation not found"));
 
         if (!invitation.getTenantId().equals(tenantId)) {
             throw new AccessDeniedException("You don't have permission to resend this invitation");
@@ -97,6 +109,61 @@ public class InvitationController {
         return mapToResponse(invitation);
     }
 
-    // Helper methods and DTOs...
+    /**
+     * Gets the tenant ID of the currently authenticated user
+     * @return UUID of the user's tenant
+     * @throws AccessDeniedException if user is not authenticated
+     */
+    private UUID getCurrentUserTenantId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            String username = auth.getName();
+            return userRepository.findByUsername(username)
+                    .map(LibraryUser::getTenantId)
+                    .orElseThrow(() -> new AccessDeniedException("User has no associated tenant"));
+        }
+        throw new AccessDeniedException("Not authenticated");
+    }
 
+    /**
+     * Gets the ID of the currently authenticated user
+     * @return UUID of the user
+     * @throws AccessDeniedException if user is not authenticated
+     */
+    private UUID getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            String username = auth.getName();
+            return userRepository.findByUsername(username)
+                    .map(LibraryUser::getId)
+                    .orElseThrow(() -> new AccessDeniedException("User not found"));
+        }
+        throw new AccessDeniedException("Not authenticated");
+    }
+
+    /**
+     * Maps an EmployeeInvitation entity to an InvitationResponse DTO
+     * @param invitation The invitation entity
+     * @return The response DTO
+     */
+    private InvitationResponse mapToResponse(EmployeeInvitation invitation) {
+        String invitedByName = "Unknown";
+
+        // Try to get the name of the admin who sent the invitation
+        if (invitation.getInvitedBy() != null) {
+            invitedByName = userRepository.findById(invitation.getInvitedBy())
+                    .map(user -> user.getFirstName() + " " + user.getLastName())
+                    .orElse("Unknown");
+        }
+
+        return new InvitationResponse(
+                invitation.getId(),
+                invitation.getEmail(),
+                invitation.getInvitedBy(),
+                invitedByName,
+                invitation.getCreatedAt(),
+                invitation.getExpiresAt(),
+                invitation.isUsed()
+        );
+    }
 }

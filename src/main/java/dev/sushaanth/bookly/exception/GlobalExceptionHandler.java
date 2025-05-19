@@ -5,8 +5,10 @@ import dev.sushaanth.bookly.tenant.exception.InvalidTenantException;
 import dev.sushaanth.bookly.tenant.exception.TenantAlreadyExistsException;
 import dev.sushaanth.bookly.tenant.exception.TenantCreationException;
 import dev.sushaanth.bookly.tenant.exception.TenantNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -139,6 +141,32 @@ public class GlobalExceptionHandler {
         problemDetail.setTitle("Invitation Expired");
         problemDetail.setType(URI.create("https://api.bookly.dev/errors/invitation-expired"));
         problemDetail.setProperty("timestamp", Instant.now());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDeniedException(AccessDeniedException ex, HttpServletRequest request) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN,
+                ex.getMessage()
+        );
+        problemDetail.setTitle("Access Denied");
+        problemDetail.setType(URI.create("https://api.bookly.dev/errors/access-denied"));
+        problemDetail.setProperty("timestamp", Instant.now());
+        problemDetail.setInstance(URI.create(request.getRequestURI()));
+        return problemDetail;
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ProblemDetail handleRuntimeException(RuntimeException ex, HttpServletRequest request) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                ex.getMessage()
+        );
+        problemDetail.setTitle("Internal Server Error");
+        problemDetail.setType(URI.create("https://api.bookly.dev/errors/server-error"));
+        problemDetail.setProperty("timestamp", Instant.now());
+        problemDetail.setInstance(URI.create(request.getRequestURI()));
         return problemDetail;
     }
 }
