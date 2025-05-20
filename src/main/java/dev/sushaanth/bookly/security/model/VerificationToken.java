@@ -1,7 +1,11 @@
 package dev.sushaanth.bookly.security.model;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.sushaanth.bookly.security.dto.RegistrationRequest;
 import jakarta.persistence.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -9,6 +13,9 @@ import java.util.UUID;
 @Entity
 @Table(name = "verification_tokens")
 public class VerificationToken {
+    private static final Logger logger = LoggerFactory.getLogger(VerificationToken.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -34,12 +41,11 @@ public class VerificationToken {
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @Transient
-    private RegistrationRequest registrationData;
+    // Store JSON serialized registration data
+    @Column(name = "registration_data", columnDefinition = "TEXT")
+    private String registrationDataJson;
 
     // Getters and setters
-
-
     public UUID getId() {
         return id;
     }
@@ -104,30 +110,39 @@ public class VerificationToken {
         this.createdAt = createdAt;
     }
 
-    public RegistrationRequest getRegistrationData() {
-        return registrationData;
+    // Methods to handle JSON serialization/deserialization
+    public void setRegistrationData(RegistrationRequest request) {
+        try {
+            // Don't serialize the password for security
+            RegistrationRequest sanitized = new RegistrationRequest(
+                    request.username(),
+                    request.firstName(),
+                    request.lastName(),
+                    request.email(),
+                    "[PROTECTED]", // Don't store raw password
+                    request.libraryName()
+            );
+            this.registrationDataJson = objectMapper.writeValueAsString(sanitized);
+        } catch (JsonProcessingException e) {
+            logger.error("Failed to serialize registration data", e);
+            throw new RuntimeException("Failed to process registration data", e);
+        }
     }
 
-    public void setRegistrationData(RegistrationRequest registrationData) {
-        this.registrationData = registrationData;
+    public RegistrationRequest getRegistrationData() {
+        if (registrationDataJson == null || registrationDataJson.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(registrationDataJson, RegistrationRequest.class);
+        } catch (JsonProcessingException e) {
+            logger.error("Failed to deserialize registration data", e);
+            return null;
+        }
     }
 
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(expiryDate);
-    }
-
-    @Override
-    public String toString() {
-        return "VerificationToken{" +
-                "id=" + id +
-                ", email='" + email + '\'' +
-                ", token='" + token + '\'' +
-                ", verified=" + verified +
-                ", expiryDate=" + expiryDate +
-                ", registrationType='" + registrationType + '\'' +
-                ", tenantId=" + tenantId +
-                ", createdAt=" + createdAt +
-                ", registrationData=" + registrationData +
-                '}';
     }
 }

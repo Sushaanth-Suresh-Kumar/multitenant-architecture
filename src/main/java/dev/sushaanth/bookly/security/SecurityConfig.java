@@ -1,4 +1,3 @@
-// src/main/java/dev/sushaanth/bookly/security/SecurityConfig.java
 package dev.sushaanth.bookly.security;
 
 import dev.sushaanth.bookly.security.jwt.JwtAuthenticationEntryPoint;
@@ -7,6 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -18,6 +18,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtRequestFilter jwtRequestFilter;
@@ -34,14 +35,17 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authz -> authz
+                        // Public endpoints
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/tenants/register").permitAll()
-                        .requestMatchers("/api/tenants/**").hasRole("ADMIN")
-                        // Add these lines to permit Swagger UI access
+                        .requestMatchers("/api/register/**").permitAll()
+
+                        // Swagger/OpenAPI
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/swagger-ui.html").permitAll()
                         .requestMatchers("/api-docs/**").permitAll()
-                        .requestMatchers("/v3/api-docs/**").permitAll() // This is important!
+                        .requestMatchers("/v3/api-docs/**").permitAll()
+
+                        // All other endpoints require authentication
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
@@ -51,6 +55,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 );
 
+        // Add JWT filter
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
