@@ -20,6 +20,7 @@ public record InvitationResponse(
         USED
     }
 
+    // Constructor without status and expired fields
     public InvitationResponse(
             UUID id,
             String email,
