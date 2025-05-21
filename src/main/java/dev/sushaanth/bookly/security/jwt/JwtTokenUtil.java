@@ -31,8 +31,9 @@ public class JwtTokenUtil {
         return new SecretKeySpec(keyBytes, SignatureAlgorithm.HS256.getJcaName());
     }
 
-    public String generateToken(String username, UUID tenantId, String schemaName, Role role) {
+    public String generateToken(String username, UUID userId, UUID tenantId, String schemaName, Role role) {
         Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId.toString());  // Add userId to claims
         claims.put("tenantId", tenantId.toString());
         claims.put("schema", schemaName);
         claims.put("role", role.getAuthority());
@@ -57,6 +58,12 @@ public class JwtTokenUtil {
             logger.error("Error parsing JWT: {}", e.getMessage());
             return null;
         }
+    }
+
+    public UUID getUserIdFromToken(String token) {
+        Claims claims = getAllClaimsFromToken(token);
+        String userId = claims != null ? claims.get("userId", String.class) : null;
+        return userId != null ? UUID.fromString(userId) : null;
     }
 
     public String getUsernameFromToken(String token) {

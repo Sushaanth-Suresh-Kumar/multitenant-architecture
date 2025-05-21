@@ -50,6 +50,7 @@ public class AuthenticationService {
 
         String jwt = jwtTokenUtil.generateToken(
                 user.getUsername(),
+                user.getId(),  // Pass user ID
                 user.getTenantId(),
                 tenant.getSchemaName(),
                 user.getRole()

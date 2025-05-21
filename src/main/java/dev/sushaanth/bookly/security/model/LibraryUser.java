@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotEmpty;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", schema = "public")
 public class LibraryUser {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
