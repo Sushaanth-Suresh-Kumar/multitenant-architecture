@@ -3,8 +3,7 @@ package dev.sushaanth.bookly.security.service;
 import dev.sushaanth.bookly.exception.BooklyException;
 import dev.sushaanth.bookly.exception.BooklyException.ErrorCode;
 import dev.sushaanth.bookly.multitenancy.context.TenantContext;
-import dev.sushaanth.bookly.security.dto.RegistrationRequest;
-import dev.sushaanth.bookly.security.dto.VerificationRequest;
+import dev.sushaanth.bookly.security.dto.*;
 import dev.sushaanth.bookly.security.model.EmployeeInvitation;
 import dev.sushaanth.bookly.security.model.LibraryUser;
 import dev.sushaanth.bookly.security.model.Role;
@@ -25,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Random;
-import java.util.UUID;
 
 @Service
 public class RegistrationService {
@@ -57,85 +55,85 @@ public class RegistrationService {
     }
 
     @Transactional
-    public void initiateLibraryRegistration(RegistrationRequest request) {
-        // Validate request
-        if (request.libraryName() == null || request.libraryName().isEmpty()) {
-            throw new BooklyException(ErrorCode.INVALID_CREDENTIALS, "Library name is required");
-        }
-
-        // Check for existing email
-        if (userRepository.findByEmail(request.email()).isPresent()) {
-            throw new BooklyException(ErrorCode.INVALID_CREDENTIALS, "Email already registered");
-        }
-
-        // Check for existing library name
-        if (tenantRepository.findByDisplayName(request.libraryName()).isPresent()) {
-            throw new BooklyException(ErrorCode.TENANT_ALREADY_EXISTS, "Library name already taken");
-        }
-
-        // Generate OTP
-        String otp = generateOtp();
-
-        // Create verification token
-        VerificationToken token = new VerificationToken();
-        token.setEmail(request.email());
-        token.setToken(otp);
-        token.setExpiryDate(LocalDateTime.now().plusMinutes(10));
-        token.setRegistrationType("LIBRARY");
-        token.setRegistrationData(request);
-
-        tokenRepository.save(token);
-
-        // Send OTP email
-        emailService.sendOtp(request.email(), otp);
-
-        logger.info("Library registration initiated for: {}", request.email());
-    }
-
-    @Transactional
-    public void initiateEmployeeRegistration(RegistrationRequest request) {
+    public EmailVerificationResponse initiateEmailVerification(InitialRegistrationRequest request) {
         // Validate email is not already registered
         if (userRepository.findByEmail(request.email()).isPresent()) {
             throw new BooklyException(ErrorCode.INVALID_CREDENTIALS, "Email already registered");
         }
 
-        // Check for valid invitation
-        EmployeeInvitation invitation = invitationRepository.findByEmailAndUsedFalse(request.email())
-                .orElseThrow(() -> new BooklyException(
-                        ErrorCode.INVALID_CREDENTIALS,
-                        "No valid invitation found for this email"
-                ));
+        String registrationType = request.registrationType();
+        if (registrationType == null) {
+            registrationType = "LIBRARY"; // Default to library registration
+        }
 
-        // Check if invitation expired
-        if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new BooklyException(
-                    ErrorCode.EXPIRED_INVITATION,
-                    "Invitation has expired"
-            );
+        // For employee registration, validate invitation
+        if ("EMPLOYEE".equals(registrationType)) {
+            // Check for valid invitation if it's employee registration
+            if (request.invitationId() == null) {
+                throw new BooklyException(
+                        ErrorCode.INVALID_CREDENTIALS,
+                        "Invitation ID is required for employee registration"
+                );
+            }
+
+            EmployeeInvitation invitation = invitationRepository
+                    .findById(request.invitationId())
+                    .orElseThrow(() -> new BooklyException(
+                            ErrorCode.INVALID_CREDENTIALS,
+                            "Invalid invitation ID"
+                    ));
+
+            if (!invitation.getEmail().equals(request.email())) {
+                throw new BooklyException(
+                        ErrorCode.INVALID_CREDENTIALS,
+                        "Email does not match invitation"
+                );
+            }
+
+            if (invitation.isUsed()) {
+                throw new BooklyException(
+                        ErrorCode.INVALID_CREDENTIALS,
+                        "Invitation has already been used"
+                );
+            }
+
+            if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+                throw new BooklyException(
+                        ErrorCode.EXPIRED_INVITATION,
+                        "Invitation has expired"
+                );
+            }
         }
 
         // Generate OTP
         String otp = generateOtp();
 
-        // Create verification token
-        VerificationToken token = new VerificationToken();
+        // Create or update verification token
+        VerificationToken token = tokenRepository.findByEmail(request.email())
+                .orElse(new VerificationToken());
+
         token.setEmail(request.email());
         token.setToken(otp);
+        token.setVerified(false);
         token.setExpiryDate(LocalDateTime.now().plusMinutes(10));
-        token.setRegistrationType("EMPLOYEE");
-        token.setTenantId(invitation.getTenantId());
-        token.setRegistrationData(request);
+        token.setCreatedAt(LocalDateTime.now());
 
         tokenRepository.save(token);
 
         // Send OTP email
         emailService.sendOtp(request.email(), otp);
 
-        logger.info("Employee registration initiated for: {}", request.email());
+        logger.info("Email verification initiated for: {}", request.email());
+
+        return new EmailVerificationResponse(
+                request.email(),
+                "Verification code sent to your email",
+                token.getExpiryDate()
+        );
     }
 
     @Transactional
-    public void verifyAndCompleteRegistration(VerificationRequest request) {
+    public EmailVerificationResult verifyEmail(VerificationRequest request) {
         // Find verification token
         VerificationToken token = tokenRepository.findByEmailAndToken(request.email(), request.otp())
                 .orElseThrow(() -> new BooklyException(ErrorCode.INVALID_OTP, "Invalid OTP"));
@@ -153,44 +151,66 @@ public class RegistrationService {
         token.setVerified(true);
         tokenRepository.save(token);
 
-        // Complete registration based on type
-        if ("LIBRARY".equals(token.getRegistrationType())) {
-            completeLibraryRegistration(token);
-        } else if ("EMPLOYEE".equals(token.getRegistrationType())) {
-            completeEmployeeRegistration(token);
-        } else {
-            throw new BooklyException(
-                    ErrorCode.INVALID_CREDENTIALS,
-                    "Unknown registration type: " + token.getRegistrationType()
-            );
-        }
+        logger.info("Email verified for: {}", request.email());
 
-        logger.info("Registration completed for: {}", request.email());
+        return new EmailVerificationResult(
+                true,
+                request.email(),
+                "Email verified successfully"
+        );
     }
 
     @Transactional
-    public void resendOtp(String email) {
-        // Find existing token
-        VerificationToken token = tokenRepository.findByEmail(email)
+    public RegistrationResponse completeRegistration(CompleteRegistrationRequest request) {
+        // Find verification token
+        VerificationToken token = tokenRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BooklyException(
                         ErrorCode.INVALID_CREDENTIALS,
-                        "No pending registration found for this email"
+                        "No verification found for this email"
                 ));
 
-        // Generate new OTP
-        String otp = generateOtp();
-        token.setToken(otp);
-        token.setExpiryDate(LocalDateTime.now().plusMinutes(10));
-        tokenRepository.save(token);
+        // Validate the token is verified
+        if (!token.isVerified()) {
+            throw new BooklyException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Email not verified yet"
+            );
+        }
 
-        // Send new OTP
-        emailService.sendOtp(email, otp);
+        // Validate unique username
+        if (userRepository.findByUsername(request.username()).isPresent()) {
+            throw new BooklyException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Username already taken"
+            );
+        }
 
-        logger.info("OTP resent for: {}", email);
+        // Check if email is part of an invitation (for employee registration)
+        EmployeeInvitation invitation = invitationRepository.findByEmailAndUsedFalse(request.email())
+                .orElse(null);
+
+        if (invitation != null) {
+            // Employee registration
+            return completeEmployeeRegistration(request, invitation);
+        } else if (request.libraryName() != null && !request.libraryName().isEmpty()) {
+            // Library registration
+            return completeLibraryRegistration(request);
+        } else {
+            throw new BooklyException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Cannot determine registration type. For library registration, provide a library name."
+            );
+        }
     }
 
-    private void completeLibraryRegistration(VerificationToken token) {
-        RegistrationRequest request = token.getRegistrationData();
+    private RegistrationResponse completeLibraryRegistration(CompleteRegistrationRequest request) {
+        // Check for existing library name
+        if (tenantRepository.findByDisplayName(request.libraryName()).isPresent()) {
+            throw new BooklyException(
+                    ErrorCode.TENANT_ALREADY_EXISTS,
+                    "Library name already taken"
+            );
+        }
 
         try {
             // Create tenant
@@ -218,6 +238,14 @@ public class RegistrationService {
 
             logger.info("Library tenant created: {} with admin: {}",
                     tenantResponse.displayName(), user.getUsername());
+
+            return new RegistrationResponse(
+                    user.getId(),
+                    user.getUsername(),
+                    user.getEmail(),
+                    user.getRole().name(),
+                    user.getTenantId()
+            );
         } catch (Exception e) {
             logger.error("Failed to complete library registration", e);
             throw new BooklyException(
@@ -227,25 +255,9 @@ public class RegistrationService {
         }
     }
 
-    private void completeEmployeeRegistration(VerificationToken token) {
-        RegistrationRequest request = token.getRegistrationData();
-
+    private RegistrationResponse completeEmployeeRegistration(
+            CompleteRegistrationRequest request, EmployeeInvitation invitation) {
         try {
-            // Find invitation
-            EmployeeInvitation invitation = invitationRepository.findByEmailAndUsedFalse(request.email())
-                    .orElseThrow(() -> new BooklyException(
-                            ErrorCode.INVALID_CREDENTIALS,
-                            "No valid invitation found"
-                    ));
-
-            // Verify invitation hasn't expired
-            if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
-                throw new BooklyException(
-                        ErrorCode.EXPIRED_INVITATION,
-                        "Invitation has expired"
-                );
-            }
-
             // Get tenant
             Tenant tenant = tenantRepository.findById(invitation.getTenantId())
                     .orElseThrow(() -> new BooklyException(
@@ -274,6 +286,14 @@ public class RegistrationService {
 
             logger.info("Employee registration completed for: {} in tenant: {}",
                     user.getEmail(), tenant.getDisplayName());
+
+            return new RegistrationResponse(
+                    user.getId(),
+                    user.getUsername(),
+                    user.getEmail(),
+                    user.getRole().name(),
+                    user.getTenantId()
+            );
         } catch (BooklyException e) {
             throw e;
         } catch (Exception e) {
@@ -285,6 +305,34 @@ public class RegistrationService {
         }
     }
 
+    @Transactional
+    public EmailVerificationResponse resendOtp(String email) {
+        // Find existing token or create new one
+        VerificationToken token = tokenRepository.findByEmail(email)
+                .orElseThrow(() -> new BooklyException(
+                        ErrorCode.INVALID_CREDENTIALS,
+                        "No pending registration found for this email"
+                ));
+
+        // Generate new OTP
+        String otp = generateOtp();
+        token.setToken(otp);
+        token.setExpiryDate(LocalDateTime.now().plusMinutes(10));
+        token.setVerified(false); // Reset verification status
+        tokenRepository.save(token);
+
+        // Send new OTP
+        emailService.sendOtp(email, otp);
+
+        logger.info("OTP resent for: {}", email);
+
+        return new EmailVerificationResponse(
+                email,
+                "Verification code resent to your email",
+                token.getExpiryDate()
+        );
+    }
+
     private void createUserProfileInTenant(LibraryUser user, String schemaName) {
         try {
             // Set tenant context
@@ -292,8 +340,6 @@ public class RegistrationService {
 
             // TODO: need to implement this
             // SQL operations to create user profile in tenant schema
-            // This would typically be done through a repository or JDBC template
-            // For example, using a TenantAwareUserRepository to save a UserProfile entity
 
             logger.info("Created user profile in tenant schema: {}", schemaName);
         } finally {
