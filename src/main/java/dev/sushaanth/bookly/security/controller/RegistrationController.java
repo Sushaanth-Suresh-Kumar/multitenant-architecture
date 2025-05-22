@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/register")
 public class RegistrationController {
@@ -21,6 +23,20 @@ public class RegistrationController {
             @Valid @RequestBody InitialRegistrationRequest request) {
         EmailVerificationResponse response = registrationService.initiateEmailVerification(request);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+
+    @PostMapping("/employee")
+    public ResponseEntity<RegistrationResponse> registerEmployeeDirectly(
+            @Valid @RequestBody DirectEmployeeRegistrationRequest request) {
+        RegistrationResponse response = registrationService.registerEmployeeDirectly(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/employee")
+    public ResponseEntity<InvitationValidationResponse> validateInvitation(
+            @RequestParam("invitation") UUID invitationId) {
+        InvitationValidationResponse response = registrationService.validateInvitation(invitationId);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/verify-email")

@@ -1,16 +1,13 @@
 package dev.sushaanth.bookly.security.dto;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-public record CompleteRegistrationRequest(
-        @NotBlank(message = "Email is required")
-        @Email(message = "Valid email is required")
-        String email,
+import java.util.UUID;
 
-        @NotBlank(message = "Verification token is required")
-        String verificationToken,
+public record DirectEmployeeRegistrationRequest(
+        @NotBlank(message = "Invitation ID is required")
+        UUID invitationId,
 
         @NotBlank(message = "Username is required")
         String username,
@@ -23,8 +20,5 @@ public record CompleteRegistrationRequest(
 
         @NotBlank(message = "Password is required")
         @Size(min = 8, message = "Password must be at least 8 characters")
-        String password,
-
-        @NotBlank(message = "Library name is required")
-        String libraryName
+        String password
 ) {}

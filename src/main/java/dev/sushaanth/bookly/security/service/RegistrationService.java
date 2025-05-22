@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Random;
+import java.util.UUID;
 
 @Service
 public class RegistrationService {
@@ -61,49 +62,8 @@ public class RegistrationService {
             throw new BooklyException(ErrorCode.INVALID_CREDENTIALS, "Email already registered");
         }
 
-        String registrationType = request.registrationType();
-        if (registrationType == null) {
-            registrationType = "LIBRARY"; // Default to library registration
-        }
-
-        // For employee registration, validate invitation
-        if ("EMPLOYEE".equals(registrationType)) {
-            // Check for valid invitation if it's employee registration
-            if (request.invitationId() == null) {
-                throw new BooklyException(
-                        ErrorCode.INVALID_CREDENTIALS,
-                        "Invitation ID is required for employee registration"
-                );
-            }
-
-            EmployeeInvitation invitation = invitationRepository
-                    .findById(request.invitationId())
-                    .orElseThrow(() -> new BooklyException(
-                            ErrorCode.INVALID_CREDENTIALS,
-                            "Invalid invitation ID"
-                    ));
-
-            if (!invitation.getEmail().equals(request.email())) {
-                throw new BooklyException(
-                        ErrorCode.INVALID_CREDENTIALS,
-                        "Email does not match invitation"
-                );
-            }
-
-            if (invitation.isUsed()) {
-                throw new BooklyException(
-                        ErrorCode.INVALID_CREDENTIALS,
-                        "Invitation has already been used"
-                );
-            }
-
-            if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
-                throw new BooklyException(
-                        ErrorCode.EXPIRED_INVITATION,
-                        "Invitation has expired"
-                );
-            }
-        }
+        // This is now ONLY for library admin registration - no need to check invitation
+        // Remove all the employee registration logic from here
 
         // Generate OTP
         String otp = generateOtp();
@@ -123,7 +83,7 @@ public class RegistrationService {
         // Send OTP email
         emailService.sendOtp(request.email(), otp);
 
-        logger.info("Email verification initiated for: {}", request.email());
+        logger.info("Library admin email verification initiated for: {}", request.email());
 
         return new EmailVerificationResponse(
                 request.email(),
@@ -185,22 +145,8 @@ public class RegistrationService {
             );
         }
 
-        // Check if email is part of an invitation (for employee registration)
-        EmployeeInvitation invitation = invitationRepository.findByEmailAndUsedFalse(request.email())
-                .orElse(null);
-
-        if (invitation != null) {
-            // Employee registration
-            return completeEmployeeRegistration(request, invitation);
-        } else if (request.libraryName() != null && !request.libraryName().isEmpty()) {
-            // Library registration
-            return completeLibraryRegistration(request);
-        } else {
-            throw new BooklyException(
-                    ErrorCode.INVALID_CREDENTIALS,
-                    "Cannot determine registration type. For library registration, provide a library name."
-            );
-        }
+        // This endpoint is now ONLY for library admin registration
+        return completeLibraryRegistration(request);
     }
 
     private RegistrationResponse completeLibraryRegistration(CompleteRegistrationRequest request) {
@@ -298,6 +244,160 @@ public class RegistrationService {
             throw e;
         } catch (Exception e) {
             logger.error("Failed to complete employee registration", e);
+            throw new BooklyException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Failed to complete registration: " + e.getMessage()
+            );
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public InvitationValidationResponse validateInvitation(UUID invitationId) {
+        try {
+            EmployeeInvitation invitation = invitationRepository.findById(invitationId)
+                    .orElseThrow(() -> new BooklyException(
+                            ErrorCode.INVALID_CREDENTIALS,
+                            "Invalid or expired invitation"
+                    ));
+
+            // Check if invitation is still valid
+            if (invitation.isUsed()) {
+                throw new BooklyException(
+                        ErrorCode.INVALID_CREDENTIALS,
+                        "This invitation has already been used"
+                );
+            }
+
+            if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+                throw new BooklyException(
+                        ErrorCode.EXPIRED_INVITATION,
+                        "This invitation has expired"
+                );
+            }
+
+            // Check if email is already registered
+            if (userRepository.findByEmail(invitation.getEmail()).isPresent()) {
+                throw new BooklyException(
+                        ErrorCode.INVALID_CREDENTIALS,
+                        "An account with this email already exists"
+                );
+            }
+
+            // Get tenant and inviter info
+            Tenant tenant = tenantRepository.findById(invitation.getTenantId())
+                    .orElseThrow(() -> new BooklyException(
+                            ErrorCode.TENANT_NOT_FOUND,
+                            "Library not found"
+                    ));
+
+            String invitedByName = "Unknown";
+            if (invitation.getInvitedBy() != null) {
+                invitedByName = userRepository.findById(invitation.getInvitedBy())
+                        .map(user -> user.getFirstName() + " " + user.getLastName())
+                        .orElse("Unknown");
+            }
+
+            return new InvitationValidationResponse(
+                    true,
+                    invitation.getEmail(),
+                    tenant.getDisplayName(),
+                    invitedByName,
+                    invitation.getExpiresAt(),
+                    "Invitation is valid"
+            );
+        } catch (BooklyException e) {
+            return new InvitationValidationResponse(
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    e.getMessage()
+            );
+        }
+    }
+
+    @Transactional
+    public RegistrationResponse registerEmployeeDirectly(DirectEmployeeRegistrationRequest request) {
+        // Validate invitation
+        EmployeeInvitation invitation = invitationRepository.findById(request.invitationId())
+                .orElseThrow(() -> new BooklyException(
+                        ErrorCode.INVALID_CREDENTIALS,
+                        "Invalid invitation ID"
+                ));
+
+        // Check if invitation is still valid
+        if (invitation.isUsed()) {
+            throw new BooklyException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "This invitation has already been used"
+            );
+        }
+
+        if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new BooklyException(
+                    ErrorCode.EXPIRED_INVITATION,
+                    "This invitation has expired"
+            );
+        }
+
+        // Check if email is already registered
+        if (userRepository.findByEmail(invitation.getEmail()).isPresent()) {
+            throw new BooklyException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "An account with this email already exists"
+            );
+        }
+
+        // Validate unique username
+        if (userRepository.findByUsername(request.username()).isPresent()) {
+            throw new BooklyException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Username is already taken"
+            );
+        }
+
+        try {
+            // Get tenant
+            Tenant tenant = tenantRepository.findById(invitation.getTenantId())
+                    .orElseThrow(() -> new BooklyException(
+                            ErrorCode.TENANT_NOT_FOUND,
+                            "Library not found"
+                    ));
+
+            // Create employee user
+            LibraryUser user = new LibraryUser();
+            user.setUsername(request.username());
+            user.setEmail(invitation.getEmail()); // Use email from invitation
+            user.setFirstName(request.firstName());
+            user.setLastName(request.lastName());
+            user.setPassword(passwordEncoder.encode(request.password()));
+            user.setRole(Role.ROLE_EMPLOYEE);
+            user.setTenantId(invitation.getTenantId());
+
+            userRepository.save(user);
+
+            // Create user profile in tenant schema
+            createUserProfileInTenant(user, tenant.getSchemaName());
+
+            // Mark invitation as used
+            invitation.setUsed(true);
+            invitationRepository.save(invitation);
+
+            logger.info("Direct employee registration completed for: {} in tenant: {}",
+                    user.getEmail(), tenant.getDisplayName());
+
+            return new RegistrationResponse(
+                    user.getId(),
+                    user.getUsername(),
+                    user.getEmail(),
+                    user.getRole().name(),
+                    user.getTenantId()
+            );
+        } catch (BooklyException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Failed to complete direct employee registration", e);
             throw new BooklyException(
                     ErrorCode.INVALID_CREDENTIALS,
                     "Failed to complete registration: " + e.getMessage()
