@@ -34,10 +34,7 @@ CREATE TABLE IF NOT EXISTS public.verification_tokens (
     token VARCHAR(255) NOT NULL,
     verified BOOLEAN NOT NULL DEFAULT FALSE,
     expiry_date TIMESTAMP NOT NULL,
-    registration_type VARCHAR(50),
-    tenant_id UUID,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    registration_data TEXT
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 

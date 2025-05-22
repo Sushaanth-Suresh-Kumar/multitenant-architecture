@@ -5,11 +5,14 @@
     <div style='background-color: #f0f0f0; padding: 15px; margin: 20px 0;'>
         <p>Click the button below to complete your registration:</p>
         <div style='text-align: center;'>
-            <a href='${invitationUrl}' style='display: inline-block; background-color: #4285f4; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;'>Accept Invitation</a>
+            <a href='${baseUrl}/register/employee?invitation=${invitationId}'
+               style='display: inline-block; background-color: #4285f4; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;'>
+                Complete Registration
+            </a>
         </div>
     </div>
     <p>Alternatively, you can copy and paste the following link into your browser:</p>
-    <p style='word-break: break-all;'><small>${invitationUrl}</small></p>
+    <p style='word-break: break-all;'><small>${baseUrl}/register/employee?invitation=${invitationId}</small></p>
     <p><strong>Note:</strong> This invitation expires in 7 days.</p>
     <p>If you did not expect this invitation, please disregard this email.</p>
     <hr style='border: 1px solid #eee; margin: 20px 0;'>

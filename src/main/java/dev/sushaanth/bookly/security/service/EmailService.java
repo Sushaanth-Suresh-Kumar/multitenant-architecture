@@ -45,7 +45,8 @@ public class EmailService {
         Map<String, Object> templateModel = new HashMap<>();
         templateModel.put("adminName", adminName);
         templateModel.put("libraryName", libraryName);
-        templateModel.put("invitationUrl", baseUrl + "/register/employee?invitation=" + invitationId);
+        templateModel.put("baseUrl", baseUrl);
+        templateModel.put("invitationId", invitationId);
 
         sendEmail(
                 to,

@@ -1,12 +1,13 @@
 package dev.sushaanth.bookly.security.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
 
 public record DirectEmployeeRegistrationRequest(
-        @NotBlank(message = "Invitation ID is required")
+        @NotNull(message = "Invitation ID is required")
         UUID invitationId,
 
         @NotBlank(message = "Username is required")
